@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carte du son</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+/* Layout: a clickable map (source, signal, ear) on top; the zoomed node's topics, widget and questions below. */
+:root{
+  --bg:#f4f5f9; --dot:#dcdfea; --card:#ffffff; --ink:#191c33; --muted:#5a5f7a; --line:#d3d6e3;
+  --c1:#d8344f; --c2:#4152cf; --c3:#0b8a7f;
+  --ok:#1b7f45; --ok-bg:#dcf3e4; --bad:#b92a36; --bad-bg:#fbe1e3;
+  --scr:#13202b; --gridc:#2c4050; --trace:#ffd23f; --scr-ink:#e8eef2;
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",Verdana,system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#13152a; --dot:#23264a; --card:#1d2040; --ink:#eef0fb; --muted:#a7abc9; --line:#363a66;
+    --c1:#ff7088; --c2:#8f9bff; --c3:#3fd1c2; --ok:#6bd896; --ok-bg:#173d2a; --bad:#ff8d94; --bad-bg:#4a1f25; color-scheme:dark; }
+}
+:root[data-theme="dark"]{ --bg:#13152a; --dot:#23264a; --card:#1d2040; --ink:#eef0fb; --muted:#a7abc9; --line:#363a66;
+  --c1:#ff7088; --c2:#8f9bff; --c3:#3fd1c2; --ok:#6bd896; --ok-bg:#173d2a; --bad:#ff8d94; --bad-bg:#4a1f25; color-scheme:dark; }
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0; color:var(--ink); font:400 17px/1.5 var(--body); background-color:var(--bg);
+  background-image:radial-gradient(var(--dot) 1.2px, transparent 1.3px); background-size:22px 22px}
+.wrap{max-width:1100px; margin:0 auto; padding-inline:16px; padding-block:14px 48px}
+button{font:inherit; color:inherit; cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--c2); outline-offset:2px}
+header{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px}
+header h1{font:800 clamp(22px,4.6vw,32px)/1.15 var(--display); margin:0 auto 0 0; text-wrap:balance}
+.pill{background:var(--card); border:2px solid var(--line); border-radius:999px; padding:4px 12px; font-weight:700; font-size:15px}
+button.pill{border-color:var(--ink)}
+.hint{color:var(--muted); margin:0 0 6px}
+#map{display:block; width:100%; height:auto; touch-action:manipulation; user-select:none}
+#map.zoomed{height:min(380px,48vh)}
+#map .hot{cursor:pointer}
+#map .sat rect{transition:transform .15s}
+#map .sat:hover rect,#map .hot:hover .ring{stroke-width:4}
+#map text{font-family:var(--body); font-weight:700; fill:var(--ink)}
+.panel{background:var(--card); border:2px solid var(--line); border-radius:20px; padding:18px; margin-top:6px}
+.phead{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+.phead h2{font:800 24px/1.2 var(--display); margin:0 auto 0 0}
+.sw{width:16px; height:16px; border-radius:50%; flex:none}
+.back{background:none; border:2px solid var(--line); border-radius:999px; padding:4px 12px; font-size:15px; font-weight:700}
+.tabs{display:flex; flex-wrap:wrap; gap:8px; margin:14px 0}
+.tab{border:2px solid var(--line); border-radius:999px; background:var(--bg); padding:6px 14px; font-weight:700; font-size:15px}
+.tab[aria-selected="true"]{background:var(--zc); border-color:var(--zc); color:var(--card)}
+.tab .tick{margin-left:6px}
+.topic{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.25fr); gap:20px; align-items:start}
+@media (max-width:760px){.topic{grid-template-columns:1fr}}
+.topic h3{font:800 20px/1.25 var(--display); margin:0 0 8px}
+.topic p{margin:0 0 10px}
+.wid{background:var(--bg); border:2px solid var(--line); border-radius:16px; padding:12px; min-width:0}
+.wid svg{display:block; width:100%; height:auto; color:var(--ink)}
+.ft{font:700 12px var(--body); fill:currentColor}
+.fs{font:700 12px var(--body); fill:var(--scr-ink)}
+.ctl{display:grid; gap:8px; margin-top:10px}
+.row{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.btn{border:2px solid var(--ink); border-bottom-width:4px; border-radius:12px; background:var(--card); padding:8px 14px; font-weight:700}
+.btn[aria-pressed="true"],.btn.on{background:var(--ink); color:var(--card)}
+.sl{display:block; font-weight:700; font-size:15px; color:var(--muted)}
+.sl input{display:block; width:100%; accent-color:var(--zc); height:28px}
+.read{display:flex; flex-wrap:wrap; gap:6px 16px; font-variant-numeric:tabular-nums; margin-top:6px}
+.read b{font:800 20px var(--display)}
+.info{background:var(--card); border:2px solid var(--line); border-radius:12px; padding:10px 12px; margin-top:10px; min-height:56px}
+.qs{margin-top:18px; display:grid; gap:12px}
+.qs h4{font:800 17px var(--display); margin:0}
+.q{border:2px solid var(--line); border-radius:14px; padding:12px; background:var(--bg)}
+.q p{margin:0 0 8px; font-weight:700}
+.opts{display:grid; gap:6px}
+.opt{text-align:left; border:2px solid var(--line); border-bottom-width:3px; border-radius:10px; background:var(--card); padding:8px 12px}
+.opt.good{border-color:var(--ok); background:var(--ok-bg)} .opt.wrong{border-color:var(--bad); background:var(--bad-bg)}
+.opt:disabled{cursor:default; color:inherit}
+.why{margin:8px 0 0; font-size:15px} .why b{color:var(--ok)} .why b.no{color:var(--bad)}
+.redo{background:none; border:0; color:var(--muted); text-decoration:underline; font-size:14px; justify-self:start; padding:4px 0}
+.cards{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:12px}
+@media (max-width:760px){.cards{grid-template-columns:1fr}}
+.card{border:2px solid var(--line); border-top:6px solid var(--zc); border-radius:14px; background:var(--bg); padding:12px 14px; text-align:left}
+.card b{font:800 18px var(--display); display:block} .card span{color:var(--muted); font-size:15px; display:block}
+.card i{font-style:normal; font-weight:700; font-size:14px; color:var(--zc)}
+.dbbig{font:800 34px var(--display); font-variant-numeric:tabular-nums}
+.zone{display:inline-block; border-radius:999px; padding:2px 12px; font-weight:700; color:#fff}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+  <header><h1 id="h1"></h1><span class="pill" id="score"></span><button class="pill" id="lang"></button></header>
+  <p class="hint" id="hint"></p>
+  <svg id="map" role="img" aria-label="map"></svg>
+  <section class="panel" id="panel"></section>
+</div>
+<script>
+/* ============================== content ============================== */
+const B=(fr,en)=>({fr,en});
+let LANG="fr";
+try{ const l=localStorage.getItem("carte-son-lang"); if(l) LANG=l; }catch(e){}
+const T=x=>x==null?"":typeof x==="string"?x:(x[LANG]!=null?x[LANG]:x.fr);
+const fmt=n=>{let s=String(n); if(Math.abs(n)>=10000) s=s.replace(/\B(?=(\d{3})+(?!\d))/g,LANG==="fr"?" ":","); return LANG==="fr"?s.replace(".",","):s;};
+const UI={
+ h1:B("Le son, de la bouche à l'oreille","Sound, from mouth to ear"),
+ hint:B("Clique sur la bouche, sur l'onde ou sur l'oreille, ou directement sur une bulle.","Click the mouth, the wave or the ear, or go straight to a bubble."),
+ score:B("bonnes réponses","correct answers"), lang:B("English","Français"), back:B("← Vue d'ensemble","← Overview"),
+ qs:B("Questions","Questions"), redo:B("Refaire ces questions","Redo these questions"), yes:B("Oui.","Yes."), no:B("Non.","No."),
+ overview:B("Trois étapes pour qu'un son arrive jusqu'à toi","Three stages for a sound to reach you"),
+ ovtext:B("Une source vibre, la vibration se propage dans un milieu matériel, puis l'oreille la reçoit. Choisis une étape.","A source vibrates, the vibration travels through a material medium, then the ear receives it. Choose a stage."),
+ play:B("▶ Écouter","▶ Listen"), stop:B("■ Arrêter","■ Stop"), freq:B("Fréquence f","Frequency f"), amp:B("Amplitude","Amplitude"),
+ sh:{pur:B("Son pur","Pure tone"),fl:B("Flûte (synthèse)","Flute (synth)"),vi:B("Violon (synthèse)","Violin (synth)")},
+ pluck:B("Pincer la corde","Pluck the string"), withbox:B("Avec caisse de résonance","With a sound box"),
+ ring:B("▶ Faire sonner","▶ Make it ring"), airl:B("Air sous la cloche","Air under the jar"),
+ dist:B("Distance","Distance"), go:B("▶ Lancer le son","▶ Send the sound"),
+ send:B("▶ Envoyer un son dans l'oreille","▶ Send a sound into the ear"), tapPart:B("Touche une partie de l'oreille.","Tap a part of the ear."),
+ second:B("+ une deuxième source identique","+ a second identical source"), expo:B("Durée d'exposition sans risque, environ","Safe exposure time, roughly"),
+ nolimit:B("pas de limite","no limit"),
+ zones:[B("Infrasons","Infrasound"),B("Sons audibles","Audible"),B("Ultrasons","Ultrasound")],
+ animals:[[B("Éléphant","Elephant"),5,10000],[B("Humain","Human"),20,20000],[B("Chien","Dog"),60,45000],[B("Chauve-souris","Bat"),2000,110000],[B("Dauphin","Dolphin"),75,150000]],
+ media:[[B("Air","Air"),340],[B("Eau","Water"),1500],[B("Verre","Glass"),5500]],
+ voices:[[B("Voix grave (homme)","Low voice (man)"),120],[B("Voix plus aiguë (femme)","Higher voice (woman)"),220],[B("Voix d'enfant","Child's voice"),300]],
+ dbex:[[0,B("Seuil d'audibilité","Threshold of hearing")],[10,B("Vent dans les arbres","Wind in the trees")],[30,B("Chambre à coucher","Bedroom")],[40,B("Bureau tranquille","Quiet office")],[60,B("Conversation","Conversation")],[80,B("Circulation dense","Heavy traffic")],[85,B("Cantine bruyante","Noisy canteen")],[90,B("Tondeuse, moto","Lawnmower, motorbike")],[100,B("Écouteurs au maximum","Earphones at maximum")],[110,B("Concert, discothèque","Concert, nightclub")],[120,B("Seuil de douleur","Threshold of pain")],[130,B("Avion au décollage","Plane taking off")]],
+ dbz:[[0,B("Calme","Quiet"),"#1b7f45"],[60,B("Gênant","Annoying"),"#a16207"],[85,B("Danger","Danger"),"#c2410c"],[120,B("Douleur","Pain"),"#b91c1c"]],
+ ear:[["pav",B("Pavillon","Outer ear"),B("Il capte le son et le dirige vers le conduit.","It catches the sound and directs it into the canal.")],
+      ["con",B("Conduit auditif","Ear canal"),B("Il guide la vibration de l'air jusqu'au tympan.","It guides the air's vibration to the eardrum.")],
+      ["tym",B("Tympan","Eardrum"),B("Une fine membrane qui se met à vibrer avec l'air.","A thin membrane that starts vibrating with the air.")],
+      ["oss",B("Osselets","Ossicles"),B("Trois petits os (marteau, enclume, étrier) qui transmettent et amplifient la vibration.","Three tiny bones (hammer, anvil, stirrup) that pass on and amplify the vibration.")],
+      ["coc",B("Cochlée","Cochlea"),B("Ses cellules ciliées transforment la vibration en signal nerveux. Abîmées par un son trop fort, elles ne repoussent pas.","Its hair cells turn the vibration into a nerve signal. Damaged by too loud a sound, they do not grow back.")],
+      ["ner",B("Nerf auditif","Auditory nerve"),B("Il transmet le signal au cerveau, qui l'interprète comme un son.","It carries the signal to the brain, which interprets it as a sound.")]]
+};
+const NODES=[
+ {id:"src", col:"--c1", title:B("La source","The source"), sub:B("Comment un son naît","How a sound is born"), topics:["vib","box","med","voice"]},
+ {id:"wave", col:"--c2", title:B("Le signal","The signal"), sub:B("Ce qui voyage, et à quelle vitesse","What travels, and how fast"), topics:["per","amp","pitch","speed"]},
+ {id:"ear", col:"--c3", title:B("L'oreille","The ear"), sub:B("Ce que l'on entend, et les dangers","What we hear, and the dangers"), topics:["ear","aud","db","prot"]}
+];
+const TOP={
+ vib:{lab:B("Vibration","Vibration"), title:B("Tout son vient d'une vibration","Every sound comes from a vibration"), w:"pluck",
+  body:B("Une corde de guitare, la peau d'un tambour, la membrane d'un haut-parleur, tes cordes vocales : quand ils émettent un son, ils vibrent. Pose la main sur ta gorge et dis « aaa » : tu sens la vibration.<br>Pince la corde et regarde-la.","A guitar string, a drum skin, a loudspeaker cone, your vocal cords: when they make a sound, they vibrate. Put your hand on your throat and say “aaa”: you can feel the vibration.<br>Pluck the string and watch it."),
+  qs:[[B("Quel est le point commun entre une corde de guitare, un haut-parleur et les cordes vocales quand ils émettent un son ?","What do a guitar string, a loudspeaker and the vocal cords have in common when they make a sound?"),[B("Ils vibrent","They vibrate"),B("Ils chauffent","They heat up"),B("Ils se déplacent vers l'auditeur","They move towards the listener")],B("Un signal sonore est toujours produit par la vibration d'un objet.","A sound signal is always produced by a vibrating object.")],
+      [B("On trempe un diapason qui sonne dans l'eau : des gouttes jaillissent. Qu'est-ce que cela montre ?","A ringing tuning fork is dipped in water: drops splash out. What does that show?"),[B("Ses branches vibrent","Its prongs are vibrating"),B("Il est chaud","It is hot"),B("L'eau produit le son","The water makes the sound")],B("La vibration est trop rapide pour être vue, mais l'eau la révèle.","The vibration is too fast to see, but the water reveals it.")]]},
+ box:{lab:B("Résonance","Resonance"), title:B("La caisse de résonance","The sound box"), w:"pluck", box:1,
+  body:B("Une corde seule remue très peu d'air : on l'entend à peine. Sur une guitare, la corde fait vibrer la caisse en bois, qui fait vibrer beaucoup plus d'air. La caisse de résonance amplifie le son.<br>Pince la corde avec et sans la caisse.","A string on its own moves very little air: you can barely hear it. On a guitar, the string makes the wooden body vibrate, and the body moves much more air. The sound box amplifies the sound.<br>Pluck the string with and without the box."),
+  qs:[[B("À quoi sert la caisse de résonance d'une guitare ?","What is the sound box of a guitar for?"),[B("À amplifier le son","To amplify the sound"),B("À produire la vibration","To produce the vibration"),B("À rendre le son plus aigu","To make the sound higher")],B("La corde produit la vibration, la caisse l'amplifie.","The string produces the vibration, the box amplifies it.")],
+      [B("Sans caisse, la corde vibre-t-elle ?","Without the box, does the string vibrate?"),[B("Oui, mais elle met peu d'air en mouvement : le son est faible","Yes, but it moves little air: the sound is quiet"),B("Non, elle ne vibre plus","No, it stops vibrating"),B("Oui, et le son est aussi fort","Yes, and the sound is just as loud")],B("La note est la même : seule la quantité d'air mise en vibration change.","The note is the same: only the amount of air set vibrating changes.")]]},
+ med:{lab:B("Milieu","Medium"), title:B("Il faut de la matière","Matter is needed"), w:"bell",
+  body:B("La vibration passe d'une particule d'air à la suivante. Sans matière, rien ne la transmet. Fais sonner le téléphone, puis retire l'air de la cloche.","The vibration passes from one particle of air to the next. With no matter, nothing passes it on. Make the phone ring, then remove the air from the jar."),
+  qs:[[B("Sous la cloche vide, le téléphone sonne mais on ne l'entend plus. Pourquoi ?","Under the empty jar, the phone rings but can no longer be heard. Why?"),[B("Le son a besoin d'un milieu matériel pour se propager","Sound needs a material medium to travel"),B("Le téléphone s'arrête","The phone stops"),B("Le verre bloque tous les sons","Glass blocks all sounds")],B("Avec de l'air, on l'entendait très bien à travers le verre.","With air inside, it was easy to hear through the glass.")],
+      [B("Dans quels milieux le son se propage-t-il ?","In which media does sound travel?"),[B("Air, eau, acier, mais pas le vide","Air, water, steel, but not a vacuum"),B("Seulement dans l'air","Only in air"),B("Partout, même dans le vide","Everywhere, even in a vacuum")],B("Gaz, liquides et solides sont des milieux matériels.","Gases, liquids and solids are material media.")],
+      [B("Pourquoi une explosion dans l'espace est-elle silencieuse ?","Why is an explosion in space silent?"),[B("L'espace est presque vide","Space is almost empty"),B("Il y fait trop froid","It is too cold there"),B("Le son y va trop vite","Sound travels too fast there")],B("Pas de matière, pas de son. Les astronautes se parlent par radio.","No matter, no sound. Astronauts talk by radio.")]]},
+ voice:{lab:B("La voix","The voice"), title:B("Ta voix","Your voice"), w:"voice",
+  body:B("Tes cordes vocales vibrent quand l'air des poumons passe entre elles. Plus elles vibrent vite, plus la voix est aiguë. Ce sont des valeurs moyennes : chaque voix est différente.","Your vocal cords vibrate when air from the lungs passes between them. The faster they vibrate, the higher the voice. These are average values: every voice is different."),
+  qs:[[B("Une voix d'enfant est plus aiguë qu'une voix d'homme. Sa fréquence est donc…","A child's voice is higher than a man's. Its frequency is therefore…"),[B("plus grande","higher"),B("plus petite","lower"),B("la même","the same")],B("Son plus aigu, fréquence plus grande.","Higher sound, higher frequency.")],
+      [B("Quand tu chantes une note plus aiguë, tes cordes vocales vibrent…","When you sing a higher note, your vocal cords vibrate…"),[B("plus vite","faster"),B("plus lentement","more slowly"),B("plus fort, mais à la même vitesse","harder, but at the same rate")],B("Plus de vibrations par seconde : la fréquence augmente.","More vibrations per second: the frequency increases.")]]},
+ per:{lab:B("Période","Period"), title:B("Période et fréquence","Period and frequency"), w:"wave",
+  body:B("Sur l'écran, le même motif se répète : le signal est périodique.<br>La période T est la durée d'un motif, en secondes (s).<br>La fréquence f est le nombre de motifs par seconde, en hertz (Hz).<br>f = 1 ÷ T. Bouge la fréquence et regarde la période changer.","On the screen, the same pattern repeats: the signal is periodic.<br>The period T is the duration of one pattern, in seconds (s).<br>The frequency f is the number of patterns per second, in hertz (Hz).<br>f = 1 ÷ T. Move the frequency and watch the period change."),
+  qs:[[B("Que mesure la fréquence ?","What does frequency measure?"),[B("Le nombre de motifs par seconde","The number of patterns per second"),B("La durée d'un motif","The duration of one pattern"),B("La hauteur de la courbe","The height of the curve")],B("Elle s'exprime en hertz (Hz).","It is expressed in hertz (Hz).")],
+      [B("Un signal a une période T = 4 ms = 0,004 s. Quelle est sa fréquence ?","A signal has a period T = 4 ms = 0.004 s. What is its frequency?"),["250 Hz","4 Hz","400 Hz"],B("f = 1 ÷ 0,004 = 250 Hz.","f = 1 ÷ 0.004 = 250 Hz.")],
+      [B("Si la fréquence augmente, la période…","If the frequency increases, the period…"),[B("diminue","decreases"),B("augmente","increases"),B("ne change pas","stays the same")],B("Plus de motifs par seconde, donc des motifs plus courts.","More patterns per second, so shorter patterns.")]]},
+ amp:{lab:B("Amplitude","Amplitude"), title:B("L'amplitude","Amplitude"), w:"wave",
+  body:B("L'amplitude est la hauteur maximale de la courbe par rapport à l'axe. Plus elle est grande, plus le son est fort. Change l'amplitude : la période, elle, ne bouge pas.","Amplitude is the greatest height of the curve above the axis. The larger it is, the louder the sound. Change the amplitude: the period does not move."),
+  qs:[[B("On monte le volume d'une note. Que se passe-t-il sur l'écran ?","You turn up the volume of a note. What happens on the screen?"),[B("L'amplitude augmente, la période ne change pas","The amplitude increases, the period does not change"),B("La période diminue","The period decreases"),B("La forme change","The shape changes")],B("Un son plus fort n'est ni plus aigu ni plus grave.","A louder sound is neither higher nor lower.")],
+      [B("À quelle grandeur l'amplitude est-elle liée ?","Which quantity is amplitude linked to?"),[B("À l'intensité sonore","Sound intensity"),B("À la fréquence","Frequency"),B("À la célérité","Speed")],B("Grande amplitude, grande intensité sonore, niveau sonore élevé.","Large amplitude, high sound intensity, high sound level.")]]},
+ pitch:{lab:B("Hauteur, timbre","Pitch, timbre"), title:B("Hauteur et timbre","Pitch and timbre"), w:"wave",
+  body:B("La hauteur dit si un son est grave ou aigu : elle dépend de la fréquence.<br>Le timbre permet de reconnaître un instrument : même note, même période, mais une forme de signal différente. Essaie les trois timbres à la même fréquence.","Pitch tells you whether a sound is low or high: it depends on frequency.<br>Timbre lets you recognise an instrument: same note, same period, but a different signal shape. Try the three timbres at the same frequency."),
+  qs:[[B("Plus la fréquence est élevée, plus le son est…","The higher the frequency, the more the sound is…"),[B("aigu","high-pitched"),B("grave","low-pitched"),B("fort","loud")],B("La hauteur est liée à la fréquence.","Pitch is linked to frequency.")],
+      [B("Un piano et un violon jouent le même la. Qu'est-ce qui diffère ?","A piano and a violin play the same A. What differs?"),[B("La forme du signal (le timbre)","The signal shape (timbre)"),B("La période","The period"),B("La fréquence","The frequency")],B("Même note, donc même période et même fréquence.","Same note, so same period and same frequency.")],
+      [B("Quel signal correspond à un son pur ?","Which signal is a pure tone?"),[B("Une sinusoïde","A sine curve"),B("Un signal avec plusieurs bosses","A signal with several bumps"),B("Une ligne droite","A straight line")],B("Le diapason produit un son pur.","A tuning fork produces a pure tone.")]]},
+ speed:{lab:B("Célérité","Speed"), title:B("La célérité du son","The speed of sound"), w:"speed",
+  body:B("v = d ÷ Δt, avec v en m/s, d en mètres et Δt en secondes.<br>Dans l'air, le son va à environ 340 m/s. Il va plus vite dans les liquides, et encore plus dans les solides. Choisis un milieu et une distance, puis lance le son : l'animation est en temps réel.","v = d ÷ Δt, with v in m/s, d in metres and Δt in seconds.<br>In air, sound travels at about 340 m/s. It is faster in liquids, and faster still in solids. Choose a medium and a distance, then send the sound: the animation runs in real time."),
+  qs:[[B("Quelle est la célérité du son dans l'air ?","What is the speed of sound in air?"),[B("Environ 340 m/s","About 340 m/s"),B("Environ 300 000 km/s","About 300,000 km/s"),B("Environ 34 m/s","About 34 m/s")],B("300 000 km/s, c'est la lumière.","300,000 km/s is light.")],
+      [B("Le tonnerre arrive 3 s après l'éclair. À quelle distance est l'orage ?","Thunder arrives 3 s after the lightning. How far away is the storm?"),[B("Environ 1 km","About 1 km"),B("Environ 3 km","About 3 km"),B("Environ 100 m","About 100 m")],B("d = 340 × 3 = 1 020 m.","d = 340 × 3 = 1,020 m.")],
+      [B("Dans quel milieu le son est-il le plus rapide ?","In which medium is sound fastest?"),[B("Le verre (solide)","Glass (solid)"),B("L'eau (liquide)","Water (liquid)"),B("L'air (gaz)","Air (gas)")],B("Air 340 m/s, eau 1 500 m/s, verre 5 500 m/s.","Air 340 m/s, water 1,500 m/s, glass 5,500 m/s.")]]},
+ ear:{lab:B("L'oreille","The ear"), title:B("Le trajet dans l'oreille","The path through the ear"), w:"ear",
+  body:B("L'oreille transforme une vibration de l'air en signal nerveux. Touche chaque partie pour voir son rôle, ou envoie un son et suis-le.","The ear turns a vibration of the air into a nerve signal. Tap each part to see its role, or send a sound and follow it."),
+  qs:[[B("Quelle partie de l'oreille se met à vibrer en premier ?","Which part of the ear starts vibrating first?"),[B("Le tympan","The eardrum"),B("La cochlée","The cochlea"),B("Le nerf auditif","The auditory nerve")],B("Le tympan vibre, puis les osselets transmettent la vibration à la cochlée.","The eardrum vibrates, then the ossicles pass the vibration to the cochlea.")],
+      [B("Où la vibration devient-elle un signal nerveux ?","Where does the vibration become a nerve signal?"),[B("Dans la cochlée","In the cochlea"),B("Dans le pavillon","In the outer ear"),B("Dans le conduit auditif","In the ear canal")],B("Ce sont les cellules ciliées de la cochlée.","It is the hair cells of the cochlea.")],
+      [B("Les cellules ciliées abîmées par un son trop fort…","Hair cells damaged by too loud a sound…"),[B("ne repoussent pas","do not grow back"),B("repoussent en une nuit","grow back overnight"),B("repoussent en un mois","grow back in a month")],B("La perte d'audition qui en résulte est définitive.","The resulting hearing loss is permanent.")]]},
+ aud:{lab:B("Audible ?","Audible?"), title:B("Ce que l'oreille entend","What the ear can hear"), w:"aud",
+  body:B("L'oreille humaine entend de 20 Hz à 20 000 Hz. En dessous : infrasons. Au-dessus : ultrasons. Avec l'âge, on perd les sons les plus aigus. Teste ton oreille, à volume modéré (un casque marche mieux qu'un haut-parleur de téléphone).","The human ear hears from 20 Hz to 20,000 Hz. Below: infrasound. Above: ultrasound. With age, we lose the highest sounds. Test your ear at a moderate volume (headphones work better than a phone speaker)."),
+  qs:[[B("Quel est le domaine des sons audibles par l'humain ?","What is the range of sounds a human can hear?"),[B("De 20 Hz à 20 000 Hz","From 20 Hz to 20,000 Hz"),B("De 0 Hz à 20 Hz","From 0 Hz to 20 Hz"),B("Au-dessus de 20 000 Hz","Above 20,000 Hz")],B("Valeurs pour une oreille jeune et en bonne santé.","Values for a young, healthy ear.")],
+      [B("Un sifflet pour chien émet à 30 000 Hz. C'est…","A dog whistle emits at 30,000 Hz. It is…"),[B("un ultrason : le chien l'entend, pas l'humain","ultrasound: the dog hears it, humans do not"),B("un infrason","infrasound"),B("un son audible très fort","a very loud audible sound")],B("Le chien entend jusqu'à 45 000 Hz environ.","Dogs hear up to about 45,000 Hz.")],
+      [B("Les éléphants communiquent par des sons que nous n'entendons pas. Ce sont…","Elephants communicate with sounds we cannot hear. They are…"),[B("des infrasons","infrasound"),B("des ultrasons","ultrasound"),B("des sons trop faibles","sounds that are too quiet")],B("Moins de 20 Hz : trop grave pour notre oreille.","Below 20 Hz: too low for our ears.")]]},
+ db:{lab:B("Décibels","Decibels"), title:B("Le niveau sonore","Sound level"), w:"db",
+  body:B("Le niveau d'intensité sonore L se mesure en décibels (dB) avec un sonomètre. 0 dB est le seuil d'audibilité, pas l'absence de vibration. Attention : deux sources identiques ne doublent pas le niveau, elles ajoutent 3 dB. Déplace le curseur.","The sound intensity level L is measured in decibels (dB) with a sound level meter. 0 dB is the threshold of hearing, not the absence of vibration. Careful: two identical sources do not double the level, they add 3 dB. Move the slider."),
+  qs:[[B("Que représente 0 dB ?","What does 0 dB represent?"),[B("Le son le plus faible que l'oreille perçoit","The faintest sound the ear perceives"),B("L'absence totale de son","Total silence"),B("Un son dangereux","A dangerous sound")],B("C'est le seuil d'audibilité.","It is the threshold of hearing.")],
+      [B("Un violon donne 70 dB. Deux violons identiques donnent…","One violin gives 70 dB. Two identical violins give…"),["73 dB","140 dB","70 dB"],B("Doubler l'intensité sonore ajoute 3 dB.","Doubling the sound intensity adds 3 dB.")],
+      [B("Avec quel appareil mesure-t-on un niveau sonore ?","Which instrument measures a sound level?"),[B("Un sonomètre","A sound level meter"),B("Un voltmètre","A voltmeter"),B("Un oscilloscope seul","An oscilloscope alone")],B("Une application de smartphone peut aussi en donner une estimation.","A smartphone app can also give an estimate.")]]},
+ prot:{lab:B("Se protéger","Protection"), title:B("Protéger ses oreilles","Protecting your ears"), w:"db", preset:1,
+  body:B("Au-delà de 85 dB, l'audition peut être abîmée, d'autant plus vite que le niveau est élevé. Le risque dépend de trois choses : le niveau, la durée d'exposition et la distance à la source. Choisis une situation : la durée indiquée est un ordre de grandeur.","Above 85 dB, hearing can be damaged, all the faster as the level rises. The risk depends on three things: the level, the exposure time and the distance from the source. Choose a situation: the time shown is a rough guide."),
+  qs:[[B("À partir de quel niveau un son devient-il dangereux ?","From what level does a sound become dangerous?"),["85 dB","40 dB","130 dB"],B("Au-delà, la durée d'exposition sans risque diminue très vite.","Beyond that, the safe exposure time drops very fast.")],
+      [B("Quels paramètres déterminent la nocivité d'un son ?","Which factors make a sound harmful?"),[B("Niveau, durée d'exposition, distance à la source","Level, exposure time, distance from the source"),B("Seulement le niveau","Only the level"),B("La hauteur et le timbre","Pitch and timbre")],B("À un concert : s'éloigner des enceintes, porter des bouchons, faire des pauses.","At a concert: move away from the speakers, wear earplugs, take breaks.")],
+      [B("Après un concert, tes oreilles sifflent. C'est…","After a concert, your ears are ringing. It is…"),[B("un signal d'alerte : l'oreille a souffert","a warning sign: the ear has been strained"),B("normal et sans conséquence","normal and harmless"),B("l'écho de la musique","the echo of the music")],B("Ces acouphènes peuvent devenir permanents si cela se répète.","This tinnitus can become permanent if it keeps happening.")]]}
+};
+
+/* ================================ state ================================ */
+let NODE=null, TOPIC=null, W={f:300,a:.6,sh:"pur",on:false}, ANS={}, VB=null, WRAF=0, MRAF=0;
+try{ const a=localStorage.getItem("carte-son-ans"); if(a) ANS=JSON.parse(a); }catch(e){}
+const save=()=>{ try{ localStorage.setItem("carte-son-ans",JSON.stringify(ANS)); localStorage.setItem("carte-son-lang",LANG); }catch(e){} };
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const RM=typeof matchMedia==="function"&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+const nodeOf=t=>NODES.find(n=>n.topics.includes(t));
+const allQ=()=>Object.keys(TOP).reduce((s,k)=>s+TOP[k].qs.length,0);
+const good=()=>Object.values(ANS).filter(v=>v===true).length;
+
+/* ================================ sound ================================ */
+const H={pur:[1],fl:[1,.45,.2,.08],vi:[1,.75,.6,.5,.3,.25]}, PH=[0,.6,1.9,.3,2.4,1.1];
+const wav=(h,x)=>{let s=0;for(let i=0;i<h.length;i++) s+=h[i]*Math.sin((i+1)*x+PH[i]); return s;};
+const PK={}; for(const k in H){let m=0;for(let i=0;i<400;i++) m=Math.max(m,Math.abs(wav(H[k],i/400*2*Math.PI))); PK[k]=m;}
+let AC=null, osc=null, gn=null, curSh=null;
+function ctx(){ if(!AC){ const C=window.AudioContext||window.webkitAudioContext; AC=new C(); } AC.resume(); return AC; }
+function pw(a,sh){ const h=H[sh], re=new Float32Array(h.length+1), im=new Float32Array(h.length+1); h.forEach((v,i)=>{re[i+1]=v*Math.sin(PH[i]); im[i+1]=v*Math.cos(PH[i]);}); return a.createPeriodicWave(re,im); }
+function tone(f,sh,vol){ try{ const a=ctx(); if(!osc){ osc=a.createOscillator(); gn=a.createGain(); gn.gain.value=0; osc.connect(gn); gn.connect(a.destination); osc.start(); }
+  if(sh!==curSh){ osc.setPeriodicWave(pw(a,sh)); curSh=sh; } osc.frequency.setTargetAtTime(f,a.currentTime,.015); gn.gain.setTargetAtTime(vol,a.currentTime,.03); }catch(e){} }
+function hush(){ try{ if(gn) gn.gain.setTargetAtTime(0,AC.currentTime,.03); }catch(e){} }
+function blip(f,sh,peak,dur){ try{ const a=ctx(), o=a.createOscillator(), g=a.createGain(); o.setPeriodicWave(pw(a,sh)); o.frequency.value=f;
+  g.gain.setValueAtTime(peak,a.currentTime); g.gain.exponentialRampToValueAtTime(.0005,a.currentTime+dur); o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime+dur+.05); }catch(e){} }
+function wloop(fn){ cancelAnimationFrame(WRAF); const t0=performance.now(), st=t=>{ fn((t-t0)/1000); WRAF=requestAnimationFrame(st); }; WRAF=requestAnimationFrame(st); }
+function stopW(){ cancelAnimationFrame(WRAF); hush(); W.on=false; }
+
+/* ================================= map ================================= */
+function layout(){ const v=$("#map").parentElement.clientWidth<700;
+  return v?{vb:[0,0,420,950],n:{src:[210,160],wave:[210,475],ear:[210,790]},sat:[[-128,-98],[128,-98],[-128,98],[128,98]],fw:110,fh:56,zoom:c=>[0,c[1]-150,420,300]}
+          :{vb:[0,0,1000,470],n:{src:[150,240],wave:[500,240],ear:[850,240]},sat:[[-72,-160],[78,-160],[-72,160],[78,160]],fw:150,fh:72,zoom:c=>[c[0]-215,c[1]-225,430,450]}; }
+const MOUTH='<path d="M-44 2C-30-20-12-24 0-13C12-24 30-20 44 2C24 30-24 30-44 2Z" fill="var(--c1)" stroke="var(--ink)" stroke-width="4" stroke-linejoin="round"/><path d="M-44 2C-15 10 15 10 44 2" fill="none" stroke="var(--ink)" stroke-width="4"/>';
+const EAR='<path d="M-14-46C24-54 44-22 32 6C24 24 10 26 8 42C6 56-16 56-20 40" fill="none" stroke="var(--ink)" stroke-width="7" stroke-linecap="round"/><path d="M-2-26C16-28 22-8 11 2C4 8 0 12 3 22" fill="none" stroke="var(--ink)" stroke-width="5" stroke-linecap="round"/>';
+function drawMap(){
+  const Lo=layout(), sv=$("#map"); let g="";
+  const [x0,y0,w0,h0]=Lo.vb; sv.setAttribute("viewBox",(VB||Lo.vb).join(" "));
+  const P=Lo.n;
+  NODES.forEach(n=>{ const c=P[n.id]; n.topics.forEach((t,i)=>{ const o=Lo.sat[i], x=c[0]+o[0], y=c[1]+o[1]; g+=`<path d="M${c[0]} ${c[1]}L${x} ${y}" stroke="var(${n.col})" stroke-width="2" stroke-dasharray="4 5" opacity=".7"/>`; }); });
+  g+=`<g id="flow"></g>`;
+  NODES.forEach(n=>{ const [cx,cy]=P[n.id], col=`var(${n.col})`, sel=NODE===n.id;
+    if(n.id==="wave") g+=`<g class="hot" data-n="wave"><rect class="ring" x="${cx-Lo.fw}" y="${cy-Lo.fh}" width="${Lo.fw*2}" height="${Lo.fh*2}" rx="14" fill="var(--scr)" stroke="${col}" stroke-width="${sel?6:3}"/><path id="mw" fill="none" stroke="var(--trace)" stroke-width="3" stroke-linejoin="round"/></g>`;
+    else g+=`<g class="hot" data-n="${n.id}"><circle class="ring" cx="${cx}" cy="${cy}" r="68" fill="color-mix(in srgb,${col} 14%,var(--card))" stroke="${col}" stroke-width="${sel?6:3}"/><g transform="translate(${cx} ${cy})">${n.id==="src"?MOUTH:EAR}</g></g>`;
+    const ly=n.id==="wave"?cy+Lo.fh+24:cy+92; g+=`<text x="${cx}" y="${ly}" text-anchor="middle" style="font:800 19px var(--display)">${T(n.title)}</text>`;
+    n.topics.forEach((t,i)=>{ const o=Lo.sat[i], x=c=>c, sx=cx+o[0], sy=cy+o[1], lab=T(TOP[t].lab), w=24+lab.length*8.4, on=TOPIC===t, done=TOP[t].qs.every((_,k)=>ANS[t+k]!=null);
+      g+=`<g class="sat hot" data-t="${t}"><rect x="${sx-w/2}" y="${sy-18}" width="${w}" height="36" rx="18" fill="${on?col:"var(--card)"}" stroke="${col}" stroke-width="2.5"/><text x="${sx}" y="${sy+5.5}" text-anchor="middle" style="font-size:15px;${on?"fill:var(--card)":""}">${lab}${done?" ✓":""}</text></g>`; });
+  });
+  sv.innerHTML=g;
+  sv.querySelectorAll("[data-n]").forEach(e=>e.onclick=()=>openNode(e.dataset.n));
+  sv.querySelectorAll("[data-t]").forEach(e=>e.onclick=()=>openTopic(e.dataset.t));
+}
+function animMap(){ cancelAnimationFrame(MRAF); const t0=performance.now();
+  const step=t=>{ const s=(t-t0)/1000, Lo=layout(), P=Lo.n, mw=$("#mw"), fl=$("#flow"); if(!mw){ MRAF=requestAnimationFrame(step); return; }
+    const [cx,cy]=P.wave, cyc=Math.max(1,Math.min(12,W.f/100)), A=(Lo.fh-10)*W.a, ph=RM?0:-s*4; let d="";
+    for(let i=0;i<=160;i++){ const x=cx-Lo.fw+8+i/160*(Lo.fw*2-16), y=cy-A*wav(H[W.sh],2*Math.PI*cyc*i/160+ph)/PK[W.sh]; d+=(i?"L":"M")+x.toFixed(1)+" "+y.toFixed(1); }
+    mw.setAttribute("d",d);
+    const vert=Lo.vb[2]<500, segs=vert?[[P.src[0],P.src[1]+74,P.wave[0],P.wave[1]-Lo.fh-6],[P.wave[0],P.wave[1]+Lo.fh+34,P.ear[0],P.ear[1]-74]]:[[P.src[0]+74,P.src[1],P.wave[0]-Lo.fw-6,P.wave[1]],[P.wave[0]+Lo.fw+6,P.wave[1],P.ear[0]-74,P.ear[1]]];
+    let g=""; segs.forEach((sg,j)=>{ for(let k=0;k<3;k++){ const p=RM?(k+.5)/3:((s*.45+k/3)%1), x=sg[0]+(sg[2]-sg[0])*p, y=sg[1]+(sg[3]-sg[1])*p, rot=vert?90:0, col=j?"var(--c3)":"var(--c1)";
+      g+=`<path transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${rot})" d="M-6 -16A22 22 0 0 1 -6 16" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" opacity="${(Math.sin(p*Math.PI)).toFixed(2)}"/>`; } });
+    fl.innerHTML=g; MRAF=requestAnimationFrame(step); };
+  MRAF=requestAnimationFrame(step); }
+function zoomTo(box){ const sv=$("#map"), from=(sv.getAttribute("viewBox")||"").split(" ").map(Number), to=box||layout().vb, t0=performance.now(), dur=RM?1:520;
+  const step=t=>{ const k=Math.min(1,(t-t0)/dur), e=1-Math.pow(1-k,3), v=from.map((a,i)=>a+(to[i]-a)*e); VB=v; sv.setAttribute("viewBox",v.map(x=>x.toFixed(1)).join(" ")); if(k<1) requestAnimationFrame(step); else VB=box?to:null; };
+  requestAnimationFrame(step); }
+
+/* ================================ panel ================================ */
+function openNode(id){ const n=NODES.find(x=>x.id===id); openTopic(n.topics.find(t=>!TOP[t].qs.every((_,k)=>ANS[t+k]!=null))||n.topics[0]); }
+function openTopic(t){ const n=nodeOf(t), first=NODE!==n.id; NODE=n.id; TOPIC=t; $("#map").classList.add("zoomed"); drawMap(); if(first) zoomTo(layout().zoom(layout().n[n.id])); panel(); if(first) $("#panel").scrollIntoView({behavior:RM?"auto":"smooth",block:"nearest"}); }
+function overview(){ NODE=null; TOPIC=null; stopW(); $("#map").classList.remove("zoomed"); drawMap(); zoomTo(null); panel(); }
+function panel(){
+  stopW(); const p=$("#panel");
+  if(!NODE){ p.style.setProperty("--zc","var(--c2)");
+    p.innerHTML=`<div class="phead"><h2>${T(UI.overview)}</h2></div><p>${T(UI.ovtext)}</p><div class="cards">${NODES.map(n=>{ const tot=n.topics.reduce((s,t)=>s+TOP[t].qs.length,0), ok=n.topics.reduce((s,t)=>s+TOP[t].qs.filter((_,k)=>ANS[t+k]===true).length,0);
+      return `<button class="card" data-n="${n.id}" style="--zc:var(${n.col})"><b>${T(n.title)}</b><span>${T(n.sub)}</span><i>${ok} / ${tot}</i></button>`; }).join("")}</div>`;
+    p.querySelectorAll(".card").forEach(b=>b.onclick=()=>openNode(b.dataset.n)); return; }
+  const n=NODES.find(x=>x.id===NODE), tp=TOP[TOPIC]; p.style.setProperty("--zc",`var(${n.col})`);
+  let h=`<div class="phead"><span class="sw" style="background:var(${n.col})"></span><h2>${T(n.title)}</h2><button class="back" id="back">${T(UI.back)}</button></div>
+    <div class="tabs" role="tablist">${n.topics.map(t=>`<button class="tab" role="tab" data-t="${t}" aria-selected="${t===TOPIC}">${T(TOP[t].lab)}${TOP[t].qs.every((_,k)=>ANS[t+k]!=null)?'<span class="tick">✓</span>':""}</button>`).join("")}</div>
+    <div class="topic"><div><h3>${T(tp.title)}</h3><p>${T(tp.body)}</p></div><div class="wid" id="wid">${WID[tp.w].html(tp)}</div></div>
+    <div class="qs"><h4>${T(UI.qs)}</h4>${tp.qs.map((q,k)=>qHTML(TOPIC,k,q)).join("")}<button class="redo" id="redo">${T(UI.redo)}</button></div>`;
+  p.innerHTML=h;
+  $("#back").onclick=overview;
+  p.querySelectorAll(".tab").forEach(b=>b.onclick=()=>openTopic(b.dataset.t));
+  p.querySelectorAll(".opt").forEach(b=>b.onclick=()=>answer(b));
+  $("#redo").onclick=()=>{ tp.qs.forEach((_,k)=>delete ANS[TOPIC+k]); save(); score(); drawMap(); panel(); };
+  WID[tp.w].mount(tp);
+}
+function seeded(id,n){ let s=0; for(const c of id) s=(s*31+c.charCodeAt(0))%9973; const a=[...Array(n).keys()]; for(let i=n-1;i>0;i--){ s=(s*7919+17)%9973; const j=s%(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function qHTML(t,k,q){ const id=t+k, st=ANS[id], ord=seeded(id,q[1].length);
+  return `<div class="q" data-q="${id}"><p>${T(q[0])}</p><div class="opts">${ord.map(i=>`<button class="opt${st!=null&&i===0?" good":""}" data-i="${i}" ${st!=null?"disabled":""}>${T(q[1][i])}</button>`).join("")}</div>${st!=null?`<p class="why"><b class="${st?"":"no"}">${T(st?UI.yes:UI.no)}</b> ${T(q[2])}</p>`:""}</div>`; }
+function answer(b){ const box=b.closest(".q"), id=box.dataset.q, t=id.slice(0,-1), k=+id.slice(-1), q=TOP[t].qs[k], ok=+b.dataset.i===0;
+  ANS[id]=ok; save(); box.querySelectorAll(".opt").forEach(x=>{ x.disabled=true; if(+x.dataset.i===0) x.classList.add("good"); else if(x===b) x.classList.add("wrong"); });
+  box.insertAdjacentHTML("beforeend",`<p class="why"><b class="${ok?"":"no"}">${T(ok?UI.yes:UI.no)}</b> ${T(q[2])}</p>`); score();
+  if(TOP[t].qs.every((_,j)=>ANS[t+j]!=null)){ drawMap(); const tb=document.querySelector(`.tab[data-t="${t}"]`); if(tb&&!tb.querySelector(".tick")) tb.insertAdjacentHTML("beforeend",'<span class="tick">✓</span>'); } }
+function score(){ $("#score").textContent=`✓ ${good()} / ${allQ()} ${T(UI.score)}`; }
+
+/* =============================== widgets =============================== */
+function scopeSVG(o){ const win=(o.win||10)/1000, sh=o.sh||"pur", A=(o.amp==null?1:o.amp)*80, Wd=440, Hd=220, mid=110;
+  let g=`<rect width="${Wd}" height="${Hd}" rx="10" fill="var(--scr)"/>`; for(let i=1;i<10;i++) g+=`<path d="M${i*44} 0V${Hd}" stroke="var(--gridc)"/>`; for(let i=1;i<6;i++) g+=`<path d="M0 ${i*Hd/6}H${Wd}" stroke="var(--gridc)"/>`;
+  g+=`<path d="M0 ${mid}H${Wd}" stroke="#6b8295" stroke-width="1.5"/>`;
+  const y=t=>mid-A*wav(H[sh],2*Math.PI*o.f*t)/PK[sh]; let d=""; for(let i=0;i<=440;i++) d+=(i?"L":"M")+i+" "+y(i/440*win).toFixed(1);
+  g+=`<path d="${d}" fill="none" stroke="var(--trace)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  if(o.marks){ const Tp=1/o.f, px=Tp/win*Wd; let best=0,bx=0; for(let i=0;i<=Math.min(440,px);i++){ const v=mid-y(i/440*win); if(v>best){best=v;bx=i;} }
+    if(px>36&&bx+px<=Wd-4){ const yt=mid-best-12; g+=`<path d="M${bx} ${mid-best}V${yt-6}M${bx+px} ${mid-best}V${yt-6}" stroke="#fff" stroke-dasharray="3 3"/><path d="M${bx+4} ${yt}H${bx+px-4}" stroke="#fff" stroke-width="2"/><path d="M${bx} ${yt}l8 -5v10zM${bx+px} ${yt}l-8 -5v10z" fill="#fff"/><text x="${bx+px/2}" y="${yt-6}" text-anchor="middle" class="fs">T</text>`; }
+    if(best>12){ const ax=Math.max(14,bx-14); g+=`<path d="M${ax} ${mid}V${mid-best}" stroke="#7fd4ff" stroke-width="2.5"/><path d="M${ax} ${mid-best}l-5 9h10zM${ax} ${mid}l-5 -9h10z" fill="#7fd4ff"/><text x="${ax+6}" y="${mid-best/2+4}" class="fs" style="fill:#7fd4ff">A</text>`; } }
+  return `<svg viewBox="0 0 ${Wd} ${Hd}" role="img" aria-label="signal">${g}</svg>`; }
+const BX=f=>18+Math.log10(f)/5.3*404;
+function bandSVG(mark){ const an=UI.animals, hgt=70+an.length*24;
+  let g=`<rect x="${BX(1)}" y="24" width="${BX(20)-BX(1)}" height="22" fill="var(--line)"/><rect x="${BX(20)}" y="24" width="${BX(20000)-BX(20)}" height="22" fill="var(--c3)"/><rect x="${BX(20000)}" y="24" width="${BX(200000)-BX(20000)}" height="22" fill="var(--line)"/>`;
+  [[1,20],[20,20000],[20000,200000]].forEach((z,i)=>g+=`<text x="${(BX(z[0])+BX(z[1]))/2}" y="16" text-anchor="middle" class="ft">${T(UI.zones[i])}</text>`);
+  g+=`<text x="${BX(20)}" y="62" text-anchor="middle" class="ft">20 Hz</text><text x="${BX(20000)}" y="62" text-anchor="middle" class="ft">${fmt(20000)} Hz</text>`;
+  an.forEach((a,i)=>{ const y=84+i*24; g+=`<text x="${BX(a[1])}" y="${y}" class="ft">${T(a[0])}</text><rect x="${BX(a[1])}" y="${y+4}" width="${BX(a[2])-BX(a[1])}" height="8" rx="4" fill="var(--c2)"/>`; });
+  if(mark){ const x=BX(mark); g+=`<path d="M${x} 20V${hgt-2}" stroke="currentColor" stroke-width="3"/><circle cx="${x}" cy="35" r="7" fill="var(--card)" stroke="currentColor" stroke-width="3"/>`; }
+  return `<svg viewBox="0 0 440 ${hgt}" role="img" aria-label="frequencies">${g}</svg>`; }
+const slider=(id,lab,min,max,val,step)=>`<label class="sl" for="${id}">${lab} <span id="${id}v"></span><input type="range" id="${id}" min="${min}" max="${max}" value="${val}" step="${step||1}"></label>`;
+
+const WID={
+ wave:{ html:()=>`<div id="sc"></div><div class="read"><span>f = <b id="rf"></b></span><span>T = <b id="rt"></b></span><span>A = <b id="ra"></b></span></div>
+   <div class="ctl"><button class="btn" id="pl" aria-pressed="false">${T(UI.play)}</button>${slider("sf",T(UI.freq),0,1000,0)}${slider("sa",T(UI.amp),5,100,Math.round(W.a*100))}
+   <div class="row">${["pur","fl","vi"].map(k=>`<button class="btn sh${k===W.sh?" on":""}" data-sh="${k}">${T(UI.sh[k])}</button>`).join("")}</div></div>`,
+  mount(){ const lo=100,hi=1000, sf=$("#sf"), sa=$("#sa"), pl=$("#pl");
+   sf.value=Math.round(1000*Math.log(W.f/lo)/Math.log(hi/lo));
+   const draw=()=>{ $("#sc").innerHTML=scopeSVG({f:W.f,sh:W.sh,amp:W.a,win:10,marks:1}); $("#rf").textContent=fmt(W.f)+" Hz"; $("#rt").textContent=fmt((1000/W.f).toFixed(2))+" ms"; $("#ra").textContent=Math.round(W.a*100)+" %"; if(W.on) tone(W.f,W.sh,W.a*.22); };
+   sf.oninput=()=>{ W.f=Math.round(lo*Math.pow(hi/lo,sf.value/1000)); draw(); };
+   sa.oninput=()=>{ W.a=sa.value/100; draw(); };
+   $$(".btn.sh").forEach(b=>b.onclick=()=>{ W.sh=b.dataset.sh; $$(".btn.sh").forEach(x=>x.classList.toggle("on",x===b)); draw(); });
+   pl.onclick=()=>{ W.on=!W.on; pl.setAttribute("aria-pressed",W.on); pl.textContent=T(W.on?UI.stop:UI.play); if(W.on) draw(); else hush(); };
+   draw(); } },
+ pluck:{ html:tp=>`<svg id="ps" viewBox="0 0 440 200" role="img" aria-label="string"></svg><div class="ctl"><div class="row"><button class="btn" id="pk">${T(UI.pluck)}</button>${tp.box?`<button class="btn" id="bx" aria-pressed="true">${T(UI.withbox)}</button>`:""}</div></div>`,
+  mount(tp){ let box=!!tp.box, t0=-9, now=0; const sv=$("#ps");
+   const draw=t=>{ now=t; const e=t-t0, amp=e<0||e>3?0:(box?26:18)*Math.exp(-e*(box?1.3:2.4)), y=100+amp*Math.sin(e*55);
+     let g=box?`<path d="M60 60C20 60 10 100 40 120C10 140 30 180 80 180H330C380 180 420 150 400 120C430 90 400 60 360 60Z" fill="color-mix(in srgb,var(--c1) 22%,var(--card))" stroke="var(--c1)" stroke-width="3"/><circle cx="220" cy="120" r="26" fill="var(--scr)"/>`:"";
+     g+=`<rect x="22" y="88" width="16" height="24" rx="3" fill="currentColor"/><rect x="402" y="88" width="16" height="24" rx="3" fill="currentColor"/><path d="M38 100Q220 ${y.toFixed(1)} 402 100" fill="none" stroke="var(--ink)" stroke-width="3"/>`;
+     const n=box?18:5; for(let i=0;i<n;i++){ const ang=i/n*2*Math.PI, r=(box?90:40)+amp*1.2*Math.sin(e*40+i), cx=220+Math.cos(ang)*r*1.8, cy=100+Math.sin(ang)*r*.55; if(amp>.5) g+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="3" fill="var(--c1)" opacity="${Math.min(1,amp/14).toFixed(2)}"/>`; }
+     sv.innerHTML=g; };
+   wloop(draw);
+   $("#pk").onclick=()=>{ t0=now; blip(196,"vi",box?.35:.05,box?2.2:1.2); };
+   const bx=$("#bx"); if(bx) bx.onclick=()=>{ box=!box; bx.setAttribute("aria-pressed",box); };
+   draw(-1); } },
+ bell:{ html:()=>`<svg id="bs" viewBox="0 0 320 180" role="img" aria-label="bell jar"></svg><div class="ctl"><button class="btn" id="bl" aria-pressed="false">${T(UI.ring)}</button>${slider("sair",T(UI.airl),0,100,100)}</div>`,
+  mount(){ let on=false, air=1; const sv=$("#bs"), pts=[]; for(let i=0;i<30;i++) pts.push([112+(i*37%96),46+(i*53%96)]);
+   const draw=t=>{ const j=on?Math.sin(t*60)*1.6:0; let g=`<path d="M92 160V72a68 68 0 0 1 136 0V160" fill="none" stroke="currentColor" stroke-width="3"/><path d="M70 162H250" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>`;
+     pts.slice(0,Math.round(30*air)).forEach((p,i)=>g+=`<circle cx="${(p[0]+Math.sin(t*2+i)*2).toFixed(1)}" cy="${(p[1]+Math.cos(t*2.3+i)*2).toFixed(1)}" r="2.6" fill="var(--muted)"/>`);
+     g+=`<rect x="${146+j}" y="104" width="28" height="50" rx="5" fill="var(--c1)"/><rect x="${150+j}" y="110" width="20" height="32" rx="2" fill="var(--card)"/>`;
+     if(on) for(let k=0;k<3;k++){ const p=((t*.9+k/3)%1), r=74+p*70; g+=`<path d="M${160-r} 160A${r} ${r} 0 0 1 ${160+r} 160" fill="none" stroke="var(--c1)" stroke-width="3" opacity="${(air*(1-p)).toFixed(2)}"/>`; }
+     sv.innerHTML=g; if(on) tone((t%.9)<.45?880:1100,"pur",air*.14*(((t*6)%1)<.8?1:0)); };
+   wloop(draw); const sl=$("#sair"); $("#sairv").textContent="100 %";
+   $("#bl").onclick=e=>{ on=!on; e.target.setAttribute("aria-pressed",on); e.target.textContent=T(on?UI.stop:UI.ring); if(on) ctx(); else hush(); };
+   sl.oninput=()=>{ air=sl.value/100; $("#sairv").textContent=sl.value+" %"; }; } },
+ voice:{ html:()=>`<div id="vsc"></div><div class="ctl"><div class="row">${UI.voices.map((v,i)=>`<button class="btn vb" data-i="${i}">${T(v[0])} · ${v[1]} Hz</button>`).join("")}</div></div>`,
+  mount(){ const show=f=>$("#vsc").innerHTML=scopeSVG({f,sh:"vi",amp:.8,win:20});
+   show(UI.voices[0][1]);
+   $$(".vb").forEach(b=>b.onclick=()=>{ const f=UI.voices[+b.dataset.i][1]; $$(".vb").forEach(x=>x.classList.toggle("on",x===b)); show(f); blip(f,"vi",.3,1.4); }); } },
+ speed:{ html:()=>`<svg id="ss" viewBox="0 0 440 120" role="img" aria-label="race"></svg><div class="read"><span>v = <b id="rv"></b></span><span>Δt = <b id="rdt"></b></span><span>t = <b id="rtm">0 s</b></span></div>
+   <div class="ctl"><div class="row">${UI.media.map((m,i)=>`<button class="btn md${i?"":" on"}" data-i="${i}">${T(m[0])}</button>`).join("")}</div>${slider("sd",T(UI.dist),10,3000,680,10)}<button class="btn" id="sgo">${T(UI.go)}</button></div>`,
+  mount(){ let mi=0, d=680, run=null, now=0; const sv=$("#ss");
+   const v=()=>UI.media[mi][1], dt=()=>d/v();
+   const read=()=>{ $("#rv").textContent=fmt(v())+" m/s"; $("#rdt").textContent=fmt(dt().toFixed(dt()<1?3:2))+" s"; $("#sdv").textContent=fmt(d)+" m"; };
+   const draw=t=>{ now=t; const p=run==null?0:Math.min(1,(t-run)/dt()); let g=`<path d="M30 70H410" stroke="var(--line)" stroke-width="6" stroke-linecap="round"/><path d="M410 52V88" stroke="currentColor" stroke-width="3"/>`;
+     g+=`<g transform="translate(22 70) scale(.4)">${MOUTH}</g><g transform="translate(424 66) scale(.32)">${EAR}</g>`;
+     const x=30+380*p; if(run!=null&&p<1) for(let k=0;k<3;k++) g+=`<path transform="translate(${(x-k*12).toFixed(1)} 70)" d="M-4 -14A18 18 0 0 1 -4 14" fill="none" stroke="var(--c2)" stroke-width="4" stroke-linecap="round" opacity="${1-k*.3}"/>`;
+     g+=`<text x="220" y="112" text-anchor="middle" class="ft">${fmt(d)} m</text>`; sv.innerHTML=g;
+     if(run!=null) $("#rtm").textContent=fmt(Math.min(t-run,dt()).toFixed(2))+" s"; };
+   read(); wloop(draw);
+   $$(".md").forEach(b=>b.onclick=()=>{ mi=+b.dataset.i; $$(".md").forEach(x=>x.classList.toggle("on",x===b)); run=null; read(); });
+   $("#sd").oninput=e=>{ d=+e.target.value; run=null; read(); };
+   $("#sgo").onclick=()=>{ run=now; }; } },
+ ear:{ html:()=>`<svg id="es" viewBox="0 0 440 230" role="img" aria-label="ear"></svg><div class="info" id="ei">${T(UI.tapPart)}</div><div class="ctl"><button class="btn" id="esend">${T(UI.send)}</button></div>`,
+  mount(){ let sel=null, t0=null, now=0; const sv=$("#es"), seq=["pav","con","tym","oss","coc","ner"];
+   const parts={pav:'<path d="M70 30C20 40 10 120 40 170C55 195 80 200 90 180C100 160 80 140 92 120C100 108 104 100 104 96" fill="none" stroke-width="10" stroke-linecap="round"/>',
+     con:'<path d="M100 92H200M100 128H200" fill="none" stroke-width="5"/>', tym:'<path d="M204 84Q214 110 204 136" fill="none" stroke-width="7" stroke-linecap="round"/>',
+     oss:'<path d="M214 104l18 -10l16 12l18 -6" fill="none" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>',
+     coc:'<path d="M300 110m-30 0a30 30 0 1 0 60 0a22 22 0 1 0 -44 0a14 14 0 1 0 28 0a6 6 0 1 0 -12 0" fill="none" stroke-width="6" stroke-linecap="round"/>',
+     ner:'<path d="M332 112C360 112 380 90 420 92" fill="none" stroke-width="6" stroke-linecap="round" stroke-dasharray="2 9"/>'};
+   const lbl={pav:[46,214],con:[150,74],tym:[206,160],oss:[244,80],coc:[300,166],ner:[396,80]};
+   const draw=t=>{ now=t; let act=sel; if(t0!=null){ const k=Math.floor((t-t0)/.8); act=k<seq.length?seq[k]:null; if(k>=seq.length+1) t0=null; if(act&&act!==draw.last){ draw.last=act; $("#ei").innerHTML=info(act); } }
+     let g=`<path d="M100 92H200V128H100" fill="color-mix(in srgb,var(--c3) 10%,var(--card))"/>`;
+     if(t0!=null&&act){ const k=seq.indexOf(act), x=[60,150,206,240,300,400][k]; g+=`<circle cx="${x}" cy="110" r="${14+6*Math.sin(t*20)}" fill="var(--c3)" opacity=".35"/>`; }
+     for(const id in parts){ const on=act===id; g+=`<g class="ep" data-p="${id}" style="cursor:pointer" stroke="${on?"var(--c3)":"currentColor"}"><rect x="${lbl[id][0]-48}" y="${lbl[id][1]-16}" width="96" height="22" fill="transparent" stroke="none"/>${parts[id]}<text x="${lbl[id][0]}" y="${lbl[id][1]}" text-anchor="middle" class="ft" stroke="none" style="${on?"fill:var(--c3)":""}">${T(UI.ear.find(e=>e[0]===id)[1])}</text></g>`; }
+     sv.innerHTML=g; sv.querySelectorAll(".ep").forEach(e=>e.onclick=()=>{ sel=e.dataset.p; t0=null; $("#ei").innerHTML=info(sel); }); };
+   const info=id=>{ const e=UI.ear.find(x=>x[0]===id); return `<b>${T(e[1])}</b> : ${T(e[2])}`; };
+   wloop(draw);
+   $("#esend").onclick=()=>{ sel=null; draw.last=null; t0=now; blip(440,"fl",.25,.8); }; } },
+ aud:{ html:()=>`<div id="ab"></div><div class="read"><span>f = <b id="af"></b></span></div><div class="ctl"><button class="btn" id="apl" aria-pressed="false">${T(UI.play)}</button>${slider("asf",T(UI.freq),0,1000,0)}</div>`,
+  mount(){ const lo=20,hi=20000, s=$("#asf"), pl=$("#apl"); let f=440, on=false; s.value=Math.round(1000*Math.log(f/lo)/Math.log(hi/lo));
+   const draw=()=>{ $("#ab").innerHTML=bandSVG(f); $("#af").textContent=fmt(f)+" Hz"; if(on) tone(f,"pur",.12); };
+   s.oninput=()=>{ f=Math.round(lo*Math.pow(hi/lo,s.value/1000)); draw(); };
+   pl.onclick=()=>{ on=!on; pl.setAttribute("aria-pressed",on); pl.textContent=T(on?UI.stop:UI.play); if(on) draw(); else hush(); };
+   draw(); } },
+ db:{ html:tp=>`<div class="row" style="align-items:baseline;gap:14px"><span class="dbbig" id="dl"></span><span class="zone" id="dz"></span></div><p id="dx" style="margin:4px 0 0;font-weight:700"></p>
+   <svg id="dg" viewBox="0 0 440 46" role="img" aria-label="meter"></svg><p style="margin:2px 0 0">${T(UI.expo)} : <b id="dt"></b></p>
+   <div class="ctl">${slider("dsl","L",0,130,tp.preset?100:60)}<button class="btn" id="d2" aria-pressed="false">${T(UI.second)}</button>
+   ${tp.preset?`<div class="row">${[60,85,90,100,110].map(v=>`<button class="btn dp" data-v="${v}">${T(UI.dbex.find(e=>e[0]===v)[1])}</button>`).join("")}</div>`:""}</div>`,
+  mount(){ const s=$("#dsl"), b2=$("#d2"); let two=false;
+   const draw=()=>{ const base=+s.value, L=base+(two?3:0), z=[...UI.dbz].reverse().find(e=>L>=e[0]), ex=[...UI.dbex].reverse().find(e=>base>=e[0]);
+     $("#dl").textContent=L+" dB"; const zb=$("#dz"); zb.textContent=T(z[1]); zb.style.background=z[2]; $("#dx").textContent=T(ex[1])+(two?" × 2":""); $("#dslv").textContent=base+" dB";
+     let tx; if(L<85) tx=T(UI.nolimit); else { const h=8/Math.pow(2,(L-85)/3); tx=h>=1?fmt(Math.round(h*10)/10)+" h":h*60>=1?Math.round(h*60)+" min":Math.max(1,Math.round(h*3600))+" s"; } $("#dt").textContent=tx;
+     let g=""; UI.dbz.forEach((e,i)=>{ const a=e[0], b=i<3?UI.dbz[i+1][0]:133; g+=`<rect x="${10+a/133*420}" y="6" width="${(b-a)/133*420}" height="18" fill="${e[2]}" opacity=".85"/>`; });
+     const x=10+Math.min(L,133)/133*420; g+=`<path d="M${x} 2V30" stroke="currentColor" stroke-width="3"/><text x="${10+85/133*420}" y="42" text-anchor="middle" class="ft">85</text><text x="10" y="42" class="ft">0</text><text x="430" y="42" text-anchor="end" class="ft">130</text>`;
+     $("#dg").innerHTML=g; };
+   s.oninput=draw; b2.onclick=()=>{ two=!two; b2.setAttribute("aria-pressed",two); draw(); };
+   $$(".dp").forEach(b=>b.onclick=()=>{ s.value=b.dataset.v; draw(); });
+   draw(); } }
+};
+
+/* ================================ start ================================ */
+function boot(){ document.documentElement.lang=LANG; $("#h1").textContent=T(UI.h1); $("#hint").textContent=T(UI.hint); $("#lang").textContent=T(UI.lang); score(); drawMap(); panel(); }
+$("#lang").onclick=()=>{ LANG=LANG==="fr"?"en":"fr"; save(); boot(); };
+let lastW=0; addEventListener("resize",()=>{ const w=$("#map").parentElement.clientWidth; if((w<700)!==(lastW<700)){ VB=NODE?layout().zoom(layout().n[NODE]):null; drawMap(); } lastW=w; });
+lastW=$("#map").parentElement.clientWidth; boot(); animMap();
+</script>
